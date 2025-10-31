@@ -10,7 +10,7 @@ spec:
   containers:
     - name: kaniko
       image: gcr.io/kaniko-project/executor:latest
-      args: ["sleep", "infinity"]
+      command: ["/busybox/cat"]
       tty: true
       volumeMounts:
         - name: docker-config
@@ -23,9 +23,8 @@ spec:
   }
 
   environment {
-    // Change these:
-    REGISTRY_IMAGE = "ghcr.io/souzaxx/hextris"   // e.g., ghcr.io/desertcart/sample-app
-    IMAGE_TAG = "${env.BUILD_NUMBER}"       // keep it simple
+    REGISTRY_IMAGE = "ghcr.io/souzaxx/hextris"
+    IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
 
   stages {
@@ -45,7 +44,6 @@ spec:
               set -eu
               mkdir -p /kaniko/.docker
 
-              # Create minimal Docker auth for GHCR
               AUTH=$(printf "%s:%s" "$GH_USER" "$GH_PAT" | base64 | tr -d '\\n')
               cat > /kaniko/.docker/config.json <<EOF
               {
