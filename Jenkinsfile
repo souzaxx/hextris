@@ -5,16 +5,21 @@ pipeline {
       yaml """
 apiVersion: v1
 kind: Pod
-metadata:
-  name: kaniko
 spec:
+  restartPolicy: Never
   containers:
   - name: kaniko
-    image: gcr.io/kaniko-project/executor:latest
-    imagePullPolicy: Always
+    image: gcr.io/kaniko-project/executor:debug
     command:
-    - /busybox/cat
+    - /busybox/sleep
+    - infinity
     tty: true
+    volumeMounts:
+    - name: docker-config
+      mountPath: /kaniko/.docker
+  volumes:
+  - name: docker-config
+    emptyDir: {}
 """
     }
   }
