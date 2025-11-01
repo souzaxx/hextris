@@ -48,12 +48,12 @@ spec:
 
               AUTH=$(printf "%s:%s" "$GH_USER" "$GH_PAT" | base64 | tr -d '\\n')
               cat > /kaniko/.docker/config.json <<EOF
-              {
-                "auths": {
-                  "ghcr.io": { "auth": "${AUTH}" }
-                }
+            {
+              "auths": {
+                "ghcr.io": { "auth": "${AUTH}" }
               }
-              EOF
+            }
+            EOF
 
               /kaniko/executor \
                 --context "${WORKSPACE}" \
