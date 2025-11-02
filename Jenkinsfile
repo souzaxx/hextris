@@ -1,67 +1,76 @@
 pipeline {
   agent {
     kubernetes {
-      defaultContainer 'kaniko'
-      yaml """
+      yaml '''
 apiVersion: v1
 kind: Pod
 spec:
-  restartPolicy: Never
   containers:
   - name: kaniko
-    image: gcr.io/kaniko-project/executor:debug
+    image: gcr.io/kaniko-project/executor:v1.7.0-debug
+    tty: true
     command:
     - /busybox/sleep
     - infinity
-    tty: true
     volumeMounts:
     - name: docker-config
       mountPath: /kaniko/.docker
   volumes:
   - name: docker-config
     emptyDir: {}
-"""
+'''
     }
   }
 
   environment {
-    REGISTRY_IMAGE = "ghcr.io/souzaxx/hextris"
-    IMAGE_TAG = "${env.BUILD_NUMBER}"
+    REGISTRY_IMAGE = "souzaxx/hextris"
+    IMAGE_TAG      = "${env.BUILD_NUMBER}"
+    DOCKER_CFG_DIR = "/kaniko/.docker"
   }
 
   stages {
+
     stage('Checkout') {
       steps { checkout scm }
     }
 
-    stage('Build & Push (Kaniko → GHCR)') {
+    stage('Write docker config (from Jenkins creds)') {
       steps {
         container('kaniko') {
           withCredentials([usernamePassword(
-            credentialsId: 'ghcr',
+            credentialsId: 'dockerhub',
             usernameVariable: 'GH_USER',
             passwordVariable: 'GH_PAT'
           )]) {
             sh '''
-              set -eu
-              mkdir -p /kaniko/.docker
+                set -euo pipefail
+                mkdir -p "${DOCKER_CFG_DIR}"
+                AUTH=$(printf "%s:%s" "$GH_USER" "$GH_PAT" | base64 | tr -d '\n')
+                cat > "${DOCKER_CFG_DIR}/config.json" <<EOF
+                {
+                  "auths": {
+                    "https://index.docker.io/v1/": { "auth": "${AUTH}" }
+                  }
+                }
+                EOF
+                ls -l "${DOCKER_CFG_DIR}/config.json"
+              '''
+          }
+        }
+      }
+    }
 
-              AUTH=$(printf "%s:%s" "$GH_USER" "$GH_PAT" | base64 | tr -d '\\n')
-              cat > /kaniko/.docker/config.json <<EOF
-            {
-              "auths": {
-                "ghcr.io": { "auth": "${AUTH}" }
-              }
-            }
-            EOF
-
+    stage('Build & Push (Kaniko)') {
+      steps {
+        container('kaniko') {
+          sh '''
               /kaniko/executor \
                 --context "${WORKSPACE}" \
                 --dockerfile "${WORKSPACE}/Dockerfile" \
                 --destination "${REGISTRY_IMAGE}:${IMAGE_TAG}" \
+                --force \
                 --use-new-run
             '''
-          }
         }
       }
     }
